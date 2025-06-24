@@ -1,11 +1,26 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import os
 
 # File paths
 REVENUE_FILE = 'finances revenue.csv'
 SUPPLYCHAIN_FILE = 'supplyChain.csv'
 SALES_FILE = 'Sales csv.csv'
+
+# CSV structures (columns)
+REVENUE_COLUMNS = ['DATE', 'Customer', 'Amount']
+SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
+SALES_COLUMNS = ['Job Order', 'Customer', 'Amount']
+
+# Create empty CSV files if they don't exist
+def initialize_file(file_path, columns):
+    if not os.path.exists(file_path):
+        pd.DataFrame(columns=columns).to_csv(file_path, index=False)
+
+# Initialize files
+initialize_file(REVENUE_FILE, REVENUE_COLUMNS)
+initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS)
+initialize_file(SALES_FILE, SALES_COLUMNS)
 
 # Helper to clean amount fields (remove $)
 def clean_amount(val):
@@ -18,19 +33,20 @@ def clean_amount(val):
 @st.cache_data
 def load_revenue():
     df = pd.read_csv(REVENUE_FILE)
-    df['Amount'] = df['Amount'].apply(clean_amount)
+    if not df.empty:
+        df['Amount'] = df['Amount'].apply(clean_amount)
     return df
 
 @st.cache_data
 def load_supplychain():
-    df = pd.read_csv(SUPPLYCHAIN_FILE)
-    return df[['Job Order', 'PR', 'PO']]
+    return pd.read_csv(SUPPLYCHAIN_FILE)
 
 @st.cache_data
 def load_sales():
     df = pd.read_csv(SALES_FILE)
-    df['Amount'] = df['Amount'].apply(clean_amount)
-    return df[['Job Order', 'Customer', 'Amount']]
+    if not df.empty:
+        df['Amount'] = df['Amount'].apply(clean_amount)
+    return df
 
 # Save data function
 def save_data(file, df):
@@ -61,7 +77,8 @@ if st.session_state.page == "Finances Revenue":
     revenue_df = load_revenue()
     st.dataframe(revenue_df, use_container_width=True)
 
-    st.metric("Total Revenue", f"${revenue_df['Amount'].sum():,.2f}")
+    if not revenue_df.empty:
+        st.metric("Total Revenue", f"${revenue_df['Amount'].sum():,.2f}")
 
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
@@ -70,9 +87,8 @@ if st.session_state.page == "Finances Revenue":
         amount = st.number_input("Amount ($)", min_value=0.0, step=0.01)
         submit = st.form_submit_button("Add Revenue")
         if submit:
-            new_row = pd.DataFrame([[date, customer, f"{amount:.2f}$"]], columns=['DATE', 'Customer', 'Amount'])
-            revenue_df_orig = pd.read_csv(REVENUE_FILE)
-            updated_df = pd.concat([revenue_df_orig, new_row], ignore_index=True)
+            new_row = pd.DataFrame([[date, customer, f"{amount:.2f}$"]], columns=REVENUE_COLUMNS)
+            updated_df = pd.concat([pd.read_csv(REVENUE_FILE), new_row], ignore_index=True)
             save_data(REVENUE_FILE, updated_df)
             st.success("Revenue entry added!")
             st.experimental_rerun()
@@ -83,7 +99,8 @@ elif st.session_state.page == "Supply Chain":
     supply_df = load_supplychain()
     st.dataframe(supply_df, use_container_width=True)
 
-    st.metric("Total Orders", len(supply_df))
+    if not supply_df.empty:
+        st.metric("Total Orders", len(supply_df))
 
     st.markdown("### ➕ Add New Supply Chain Entry")
     with st.form("add_supply"):
@@ -92,9 +109,8 @@ elif st.session_state.page == "Supply Chain":
         po = st.text_input("PO Date (e.g. 20/1/2025)")
         submit = st.form_submit_button("Add Supply Entry")
         if submit:
-            new_row = pd.DataFrame([[job_order, pr, po]], columns=['Job Order', 'PR', 'PO'])
-            supply_df_orig = pd.read_csv(SUPPLYCHAIN_FILE)
-            updated_df = pd.concat([supply_df_orig, new_row], ignore_index=True)
+            new_row = pd.DataFrame([[job_order, pr, po]], columns=SUPPLYCHAIN_COLUMNS)
+            updated_df = pd.concat([pd.read_csv(SUPPLYCHAIN_FILE), new_row], ignore_index=True)
             save_data(SUPPLYCHAIN_FILE, updated_df)
             st.success("Supply chain entry added!")
             st.experimental_rerun()
@@ -105,7 +121,8 @@ elif st.session_state.page == "Sales":
     sales_df = load_sales()
     st.dataframe(sales_df, use_container_width=True)
 
-    st.metric("Total Sales Amount", f"${sales_df['Amount'].sum():,.2f}")
+    if not sales_df.empty:
+        st.metric("Total Sales Amount", f"${sales_df['Amount'].sum():,.2f}")
 
     st.markdown("### ➕ Add New Sales Entry")
     with st.form("add_sales"):
@@ -114,10 +131,8 @@ elif st.session_state.page == "Sales":
         amount = st.number_input("Amount ($)", min_value=0.0, step=0.01)
         submit = st.form_submit_button("Add Sales Entry")
         if submit:
-            new_row = pd.DataFrame([[job_order, customer, f"{amount:.2f}$"]],
-                                   columns=['Job Order', 'Customer', 'Amount'])
-            sales_df_orig = pd.read_csv(SALES_FILE)
-            updated_df = pd.concat([sales_df_orig, new_row], ignore_index=True)
+            new_row = pd.DataFrame([[job_order, customer, f"{amount:.2f}$"]], columns=SALES_COLUMNS)
+            updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
             save_data(SALES_FILE, updated_df)
             st.success("Sales entry added!")
             st.experimental_rerun()
