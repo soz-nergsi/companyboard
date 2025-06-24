@@ -3,9 +3,9 @@ import pandas as pd
 import os
 
 # File paths
-REVENUE_FILE = 'finances revenue.csv'
+REVENUE_FILE = 'finances_revenue.csv'
 SUPPLYCHAIN_FILE = 'supplyChain.csv'
-SALES_FILE = 'Sales csv.csv'
+SALES_FILE = 'sales.csv'
 
 # CSV structures
 REVENUE_COLUMNS = ['DATE', 'Customer', 'Amount']
@@ -54,19 +54,16 @@ def clean_amount(val):
     except:
         return 0.0
 
-# Load data functions
-@st.cache_data
+# Load data (no cache — latest Streamlit best practice)
 def load_revenue():
     df = pd.read_csv(REVENUE_FILE)
     if not df.empty:
         df['Amount'] = df['Amount'].apply(clean_amount)
     return df
 
-@st.cache_data
 def load_supplychain():
     return pd.read_csv(SUPPLYCHAIN_FILE)
 
-@st.cache_data
 def load_sales():
     df = pd.read_csv(SALES_FILE)
     if not df.empty:
@@ -80,7 +77,7 @@ def save_data(file, df):
 # Streamlit page config
 st.set_page_config(page_title="Company Monthly Dashboard", layout="wide")
 
-# Initialize session state for navigation
+# Initialize navigation state
 if "page" not in st.session_state:
     st.session_state.page = "Finances Revenue"
 
@@ -116,7 +113,7 @@ if st.session_state.page == "Finances Revenue":
             updated_df = pd.concat([pd.read_csv(REVENUE_FILE), new_row], ignore_index=True)
             save_data(REVENUE_FILE, updated_df)
             st.success("Revenue entry added!")
-            st.experimental_rerun()
+            st.rerun()
 
 # Supply Chain Page
 elif st.session_state.page == "Supply Chain":
@@ -138,7 +135,7 @@ elif st.session_state.page == "Supply Chain":
             updated_df = pd.concat([pd.read_csv(SUPPLYCHAIN_FILE), new_row], ignore_index=True)
             save_data(SUPPLYCHAIN_FILE, updated_df)
             st.success("Supply chain entry added!")
-            st.experimental_rerun()
+            st.rerun()
 
 # Sales Page
 elif st.session_state.page == "Sales":
@@ -160,4 +157,4 @@ elif st.session_state.page == "Sales":
             updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
             save_data(SALES_FILE, updated_df)
             st.success("Sales entry added!")
-            st.experimental_rerun()
+            st.rerun()
