@@ -7,22 +7,47 @@ REVENUE_FILE = 'finances revenue.csv'
 SUPPLYCHAIN_FILE = 'supplyChain.csv'
 SALES_FILE = 'Sales csv.csv'
 
-# CSV structures (columns)
+# CSV structures
 REVENUE_COLUMNS = ['DATE', 'Customer', 'Amount']
 SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
 SALES_COLUMNS = ['Job Order', 'Customer', 'Amount']
 
-# Create empty CSV files if they don't exist
-def initialize_file(file_path, columns):
+# Initial data
+revenue_initial_data = [
+    ['February', 'Gasin', '200$'],
+    ['February', 'TCC', '900$'],
+    ['February', 'Olympian Gym Center', '500$'],
+    ['February', 'Hedi Jalil', '44$'],
+    ['February', 'Asiacell', '35$']
+]
+
+supplychain_initial_data = [
+    ['SPH91', '5/1/2025', '20/1/2025'],
+    ['SPH77', '8/2/2025', '28/2/2025'],
+    ['SPH66', '4/3/2025', '15/4/2025'],
+    ['SPH17', '30/4/2025', '15/5/2025'],
+    ['SPH11', '27/5/2025', '1/6/2025']
+]
+
+sales_initial_data = [
+    ['s1', 'Seven Net', '100$'],
+    ['s2', 'Azo Fashion', '200$'],
+    ['s3', 'Asia Pay', '900$'],
+    ['s4', 'eklam', '500$'],
+    ['s5', 'FIG', '44$']
+]
+
+# Create files if not exist and insert initial data
+def initialize_file(file_path, columns, data):
     if not os.path.exists(file_path):
-        pd.DataFrame(columns=columns).to_csv(file_path, index=False)
+        df = pd.DataFrame(data, columns=columns)
+        df.to_csv(file_path, index=False)
 
-# Initialize files
-initialize_file(REVENUE_FILE, REVENUE_COLUMNS)
-initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS)
-initialize_file(SALES_FILE, SALES_COLUMNS)
+initialize_file(REVENUE_FILE, REVENUE_COLUMNS, revenue_initial_data)
+initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS, supplychain_initial_data)
+initialize_file(SALES_FILE, SALES_COLUMNS, sales_initial_data)
 
-# Helper to clean amount fields (remove $)
+# Helper to clean amount fields
 def clean_amount(val):
     try:
         return float(val.replace('$', '').strip())
