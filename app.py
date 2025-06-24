@@ -7,26 +7,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state for navigation
+if "page" not in st.session_state:
+    st.session_state.page = "Finances Revenue"
+
 # Sidebar
 st.sidebar.title("📅 Monthly Dashboard")
-menu = ["Finances Revenue", "Supply Chain", "Sales"]
-choice = st.sidebar.radio("Select section:", menu)
+
+# Button-like navigation
+if st.sidebar.button("💰 Finances Revenue"):
+    st.session_state.page = "Finances Revenue"
+if st.sidebar.button("🚛 Supply Chain"):
+    st.session_state.page = "Supply Chain"
+if st.sidebar.button("🛒 Sales"):
+    st.session_state.page = "Sales"
 
 # Main Title
 st.title("📊 Company Monthly Dashboard")
 
-# Main content based on selection
-if choice == "Finances Revenue":
+# Display selected page
+if st.session_state.page == "Finances Revenue":
     st.subheader("💰 Finances Revenue Overview")
     st.info("Here you can display revenue data and charts.")
-    # Placeholder for future data
 
-elif choice == "Supply Chain":
+elif st.session_state.page == "Supply Chain":
     st.subheader("🚛 Supply Chain Overview")
     st.info("Here you can display supply chain data and metrics.")
-    # Placeholder for future data
 
-elif choice == "Sales":
+elif st.session_state.page == "Sales":
     st.subheader("🛒 Sales Overview")
     st.info("Here you can display sales data and summaries.")
-    # Placeholder for future data
