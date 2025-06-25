@@ -67,10 +67,9 @@ def render():
 
         ax1.set_title("Customer Rate Analysis")
         plt.tight_layout()
-
         st.pyplot(fig1)
 
-        # Add custom legend BELOW the chart
+        # Custom legend BELOW the chart
         st.markdown(
             """
             <div style="text-align: center;">
@@ -80,6 +79,10 @@ def render():
             """,
             unsafe_allow_html=True
         )
+
+        # ✅ Add count labels after chart
+        st.write(f"Total customers ≤ $200: **{below_count}**")
+        st.write(f"Total customers > $200: **{above_count}**")
 
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
@@ -108,7 +111,7 @@ def render():
         plt.tight_layout()
         st.pyplot(fig2)
 
-        # Add custom legend BELOW the chart
+        # Custom legend BELOW the chart
         st.markdown(
             """
             <div style="text-align: center;">
