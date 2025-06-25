@@ -31,30 +31,27 @@ def render():
         df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y')
         df['Duration'] = (df['PO'] - df['PR']).dt.days
 
-        # Filter February data only
-        feb_df = df[df['PR'].dt.month == 2]
+        # ✅ Correct filtering: Use PO month to select February data
+        feb_df = df[df['PO'].dt.month == 2]
 
-        job_order_count = feb_df.shape[0]
+        # ✅ Count job orders by counting rows
+        job_order_count = len(feb_df)
         avg_duration = feb_df['Duration'].mean() if job_order_count > 0 else 0
 
         st.markdown(f"**Total February Job Orders:** {job_order_count}")
         st.markdown(f"**Average February Duration:** {avg_duration:.1f} days")
 
-        # Plotting
         fig, ax1 = plt.subplots(figsize=(6, 5))
 
-        # Bar
         bars = ax1.bar(['February'], [job_order_count], color='#FFEB3B', edgecolor='black')
 
-        # Bar label
         if job_order_count > 0:
-            ax1.text(0, job_order_count + 1, f"{job_order_count} Job Orders", 
+            ax1.text(0, job_order_count + 0.5, f"{job_order_count} Job Orders",
                      ha='center', va='bottom', fontsize=11, fontweight='bold')
 
         ax1.set_ylabel('Total Requests', color='black')
         ax1.tick_params(axis='y', labelcolor='black')
 
-        # Stepped average duration
         ax2 = ax1.twinx()
         ax2.step(['February'], [avg_duration], where='mid', color='#E91E63', linewidth=3)
         ax2.fill_between(['February'], [0], [avg_duration], step='mid', color='#E91E63', alpha=0.2)
@@ -69,7 +66,6 @@ def render():
         plt.tight_layout()
         st.pyplot(fig)
 
-        # Download
         buf = io.BytesIO()
         fig.savefig(buf, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Chart", data=buf.getvalue(),
@@ -79,7 +75,7 @@ def render():
     st.markdown("### ➕ Add New February Supply Chain Entry")
     with st.form("add_supply"):
         job_order = st.text_input("Job Order")
-        pr = st.text_input("PR Date (in February, e.g. 5/2/2025)")
+        pr = st.text_input("PR Date (e.g. 5/2/2025)")
         po = st.text_input("PO Date (e.g. 20/2/2025)")
         submit = st.form_submit_button("Add Supply Entry")
         if submit:
