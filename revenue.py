@@ -37,46 +37,53 @@ def render():
         total = df['Amount'].sum()
         st.metric("Total Revenue", f"${total:,.2f}")
 
-        # Group customers based on amount
-        below_200 = df[df['Amount'] <= 200].shape[0]
-        above_200 = df[df['Amount'] > 200].shape[0]
+        # Split into groups
+        below_200_df = df[df['Amount'] <= 200]
+        above_200_df = df[df['Amount'] > 200]
 
-        st.markdown("### 📊 Customer Rate Analysis")
+        # First Pie Chart — Customer Rate
+        st.markdown("### 📊 Customer Rate")
+        below_count = below_200_df.shape[0]
+        above_count = above_200_df.shape[0]
+
         fig1, ax1 = plt.subplots(figsize=(3, 3))
         ax1.pie(
-            [below_200, above_200],
-            labels=[f"{below_200} Customers", f"{above_200} Customers"],
+            [below_count, above_count],
+            labels=["≤ $200", "> $200"],
             autopct='%1.1f%%',
             startangle=90
         )
-        ax1.set_title("Customer Distribution")
+        ax1.set_title("Customer Rate Analysis")
         st.pyplot(fig1)
 
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button(
-            "Download Customer Chart",
+            "Download Customer Rate Chart",
             data=buf1.getvalue(),
-            file_name="customer_distribution.jpeg",
+            file_name="customer_rate.jpeg",
             mime="image/jpeg"
         )
 
-        # Revenue Impact Analysis
-        min_rev = df['Amount'].min()
-        remaining_rev = total - min_rev
+        # Second Pie Chart — Revenue Percentage Impact
+        st.markdown("### 📊 Revenue Percentage Impact")
+        below_revenue = below_200_df['Amount'].sum()
+        above_revenue = above_200_df['Amount'].sum()
 
-        st.markdown("### 📊 Revenue Impact")
+        below_pct = (below_revenue / total) * 100
+        above_pct = (above_revenue / total) * 100
+
         fig2, ax2 = plt.subplots(figsize=(3, 3))
         ax2.pie(
-            [min_rev, remaining_rev],
+            [below_revenue, above_revenue],
             labels=[
-                f"Min Revenue (${min_rev:,.0f})",
-                f"Remaining Revenue (${remaining_rev:,.0f})"
+                f"≤ $200 — {below_pct:.1f}%",
+                f"> $200 — {above_pct:.1f}%"
             ],
             autopct='%1.1f%%',
             startangle=90
         )
-        ax2.set_title("Revenue Impact")
+        ax2.set_title("Revenue Percentage Impact")
         st.pyplot(fig2)
 
         buf2 = io.BytesIO()
@@ -84,10 +91,11 @@ def render():
         st.download_button(
             "Download Revenue Impact Chart",
             data=buf2.getvalue(),
-            file_name="revenue_impact.jpeg",
+            file_name="revenue_percentage_impact.jpeg",
             mime="image/jpeg"
         )
 
+    # Add new entry form
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
         date = st.text_input("Date (e.g. February)", value="February")
