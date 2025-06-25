@@ -18,10 +18,10 @@ def load_data():
 def save_data(df):
     df.to_csv(SALES_FILE, index=False)
 
-# Cleaning function to handle '$', commas, etc.
+# Cleaning function to handle '$', commas, spaces, etc.
 def clean_amount(val):
     if isinstance(val, str):
-        val = re.sub(r'[^\d\.]', '', val)  # remove everything except numbers and dot
+        val = re.sub(r'[^\d\.]', '', val)  # remove everything except digits and dot
     try:
         return float(val)
     except:
@@ -56,15 +56,12 @@ def render():
     with st.form("add_sales"):
         job_order = st.text_input("Job Order")
         customer = st.text_input("Customer")
-        amount = st.text_input("Amount (numeric)")
+        amount = st.text_input("Amount (USD):")
         submit = st.form_submit_button("Add Sales Entry")
         if submit:
-            try:
-                amount_float = float(amount)
-                new_row = pd.DataFrame([[job_order, customer, amount_float]], columns=SALES_COLUMNS)
-                updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
-                save_data(updated_df)
-                st.success("Sales entry added!")
-                st.rerun()
-            except:
-                st.error("Please enter a valid numeric amount!")
+            cleaned_amount = clean_amount(amount)
+            new_row = pd.DataFrame([[job_order, customer, cleaned_amount]], columns=SALES_COLUMNS)
+            updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
+            save_data(updated_df)
+            st.success("Sales entry added!")
+            st.rerun()
