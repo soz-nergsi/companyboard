@@ -38,40 +38,43 @@ def render():
         total = df['Amount'].sum()
         st.metric("Total Revenue", f"${total:,.2f}")
 
-        # Split groups
+        # Split into groups
         below_df = df[df['Amount'] <= 200]
         above_df = df[df['Amount'] > 200]
 
         below_count = below_df.shape[0]
         above_count = above_df.shape[0]
-        total_count = below_count + above_count
 
-        # First Chart: Customer Rate Analysis
+        below_revenue = below_df['Amount'].sum()
+        above_revenue = above_df['Amount'].sum()
+
+        # Calmer professional colors
+        colors = ['#90caf9', '#f48fb1']  # Light blue and soft pink
+
+        # CUSTOMER RATE ANALYSIS
         st.markdown("### 📊 Customer Rate Analysis")
-
-        sizes = [below_count, above_count]
-        labels = ["≤ $200", "> $200"]
-        colors = ['yellow', 'orange']
-
         fig1, ax1 = plt.subplots(figsize=(4, 4))
+        sizes_count = [below_count, above_count]
+        labels_count = ["≤ $200", "> $200"]
+
         wedges, texts, autotexts = ax1.pie(
-            sizes,
-            labels=labels,
+            sizes_count,
+            labels=labels_count,
             colors=colors,
             autopct='%1.1f%%',
             startangle=90,
-            textprops={'color': "black", 'fontsize': 10}
+            textprops={'fontsize': 10}
         )
-        # External labels for counts
+
+        # External count labels
         for i, wedge in enumerate(wedges):
             angle = (wedge.theta2 + wedge.theta1) / 2
-            x = np.cos(np.deg2rad(angle))
-            y = np.sin(np.deg2rad(angle))
-            ha = 'left' if x > 0 else 'right'
-            ax1.text(1.1 * x, 1.1 * y, f"{sizes[i]} customers", ha=ha, va='center', fontsize=9)
+            x = 1.2 * np.cos(np.deg2rad(angle))
+            y = 1.2 * np.sin(np.deg2rad(angle))
+            ax1.text(x, y, f"{sizes_count[i]} customers", ha='center', va='center', fontsize=9)
 
         ax1.set_title("Customer Rate Analysis")
-        ax1.legend(wedges, labels, title="Legend", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+        plt.tight_layout()
         st.pyplot(fig1)
 
         buf1 = io.BytesIO()
@@ -79,36 +82,30 @@ def render():
         st.download_button("Download Customer Rate Chart", data=buf1.getvalue(),
                            file_name="customer_rate.jpeg", mime="image/jpeg")
 
-        # Second Chart: Revenue Percentage Impact
+        # REVENUE PERCENTAGE IMPACT
         st.markdown("### 📊 Revenue Percentage Impact")
-
-        below_revenue = below_df['Amount'].sum()
-        above_revenue = above_df['Amount'].sum()
-
-        below_pct = (below_revenue / total) * 100
-        above_pct = (above_revenue / total) * 100
-
-        sizes_rev = [below_revenue, above_revenue]
+        sizes_revenue = [below_revenue, above_revenue]
+        labels_revenue = ["≤ $200", "> $200"]
 
         fig2, ax2 = plt.subplots(figsize=(4, 4))
         wedges2, texts2, autotexts2 = ax2.pie(
-            sizes_rev,
-            labels=[f"≤ $200", "> $200"],
+            sizes_revenue,
+            labels=labels_revenue,
             colors=colors,
             autopct='%1.1f%%',
             startangle=90,
-            textprops={'color': "black", 'fontsize': 10}
+            textprops={'fontsize': 10}
         )
-        # External labels for revenue amounts
+
+        # External revenue amount labels
         for i, wedge in enumerate(wedges2):
             angle = (wedge.theta2 + wedge.theta1) / 2
-            x = np.cos(np.deg2rad(angle))
-            y = np.sin(np.deg2rad(angle))
-            ha = 'left' if x > 0 else 'right'
-            ax2.text(1.1 * x, 1.1 * y, f"${sizes_rev[i]:,.0f}", ha=ha, va='center', fontsize=9)
+            x = 1.2 * np.cos(np.deg2rad(angle))
+            y = 1.2 * np.sin(np.deg2rad(angle))
+            ax2.text(x, y, f"${sizes_revenue[i]:,.0f}", ha='center', va='center', fontsize=9)
 
         ax2.set_title("Revenue Percentage Impact")
-        ax2.legend(wedges2, labels, title="Legend", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+        plt.tight_layout()
         st.pyplot(fig2)
 
         buf2 = io.BytesIO()
@@ -116,7 +113,7 @@ def render():
         st.download_button("Download Revenue Impact Chart", data=buf2.getvalue(),
                            file_name="revenue_impact.jpeg", mime="image/jpeg")
 
-    # Add data form
+    # Form to add new entry
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
         date = st.text_input("Date (e.g. February)", value="February")
