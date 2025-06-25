@@ -18,7 +18,10 @@ def load_data():
     return pd.read_csv(SUPPLYCHAIN_FILE)
 
 def save_data(df):
-    df.to_csv(SUPPLYCHAIN_FILE, index=False)
+    try:
+        df.to_csv(SUPPLYCHAIN_FILE, index=False)
+    except Exception as e:
+        raise IOError("❌ Unable to save data. Please connect GitHub repository using Personal Access Token to enable saving data.")
 
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
@@ -27,17 +30,12 @@ def render():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        # ✅ Robust datetime parsing that auto-detects date formats:
         df['PR'] = pd.to_datetime(df['PR'], errors='coerce')
         df['PO'] = pd.to_datetime(df['PO'], errors='coerce')
-
-        # Drop rows with unparseable dates to prevent crash
         df = df.dropna(subset=['PR', 'PO'])
-
         df['Duration'] = (df['PO'] - df['PR']).dt.days
         df['Month'] = df['PR'].dt.strftime('%B')
 
-        # Full month list for consistent display
         months_full = ['January', 'February', 'March', 'April', 'May', 'June',
                        'July', 'August', 'September', 'October', 'November', 'December']
         full_data = pd.DataFrame({'Month': months_full})
@@ -59,13 +57,8 @@ def render():
 
         for bar, count in zip(bars, full_data['Job Order']):
             if count > 0:
-                ax1.text(
-                    bar.get_x() + bar.get_width()/2,
-                    0.2,
-                    f"{count}",
-                    ha='center', va='bottom',
-                    fontsize=10, fontweight='bold', color='black'
-                )
+                ax1.text(bar.get_x() + bar.get_width()/2, 0.2, f"{count}",
+                         ha='center', va='bottom', fontsize=10, fontweight='bold', color='black')
 
         ax1.set_xlabel('Month')
         ax1.set_ylabel('Job Orders', color='blue')
@@ -81,12 +74,8 @@ def render():
 
         for month, duration in zip(full_data['Month'], full_data['Duration']):
             if duration > 0:
-                ax2.text(
-                    month, duration + 0.3,
-                    f"{duration:.1f} Days",
-                    ha='center', va='bottom',
-                    fontsize=10, fontweight='bold', color='black'
-                )
+                ax2.text(month, duration + 0.3, f"{duration:.1f} Days",
+                         ha='center', va='bottom', fontsize=10, fontweight='bold', color='black')
 
         plt.title("Monthly Job Orders & Average Duration", fontsize=14)
         plt.xticks(rotation=45)
@@ -106,8 +95,13 @@ def render():
         po = st.text_input("PO Date (any format like 20/1/2025 or 01/20/2025)")
         submit = st.form_submit_button("Add Entry")
         if submit:
-            new_row = pd.DataFrame([[job_order, pr, po]], columns=SUPPLYCHAIN_COLUMNS)
-            updated_df = pd.concat([pd.read_csv(SUPPLYCHAIN_FILE), new_row], ignore_index=True)
-            save_data(updated_df)
-            st.success("Entry added!")
-            st.rerun()
+            try:
+                new_row = pd.DataFrame([[job_order, pr, po]], columns=SUPPLYCHAIN_COLUMNS)
+                updated_df = pd.concat([pd.read_csv(SUPPLYCHAIN_FILE), new_row], ignore_index=True)
+                save_data(updated_df)
+                st.success("Entry added!")
+                st.rerun()
+            except IOError as e:
+                st.error(str(e))
+            except Exception as e:
+                st.error(f"Unexpected error: {str(e)}")
