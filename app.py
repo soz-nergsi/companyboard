@@ -5,59 +5,30 @@ import matplotlib.pyplot as plt
 import io
 
 # File paths
-REVENUE_FILE = 'finances_revenue.csv'
-SUPPLYCHAIN_FILE = 'supplyChain.csv'
-SALES_FILE = 'sales.csv'
+REVENUE_FILE = 'revenue_data.csv'
+SUPPLYCHAIN_FILE = 'supply_chain_data.csv'
+SALES_FILE = 'sales_data.csv'
 
 # CSV structures
 REVENUE_COLUMNS = ['DATE', 'Customer', 'Amount']
 SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
 SALES_COLUMNS = ['Job Order', 'Customer', 'Amount']
 
-# Initial data
-revenue_initial_data = [
-    ['February', 'Gasin', '200$'],
-    ['February', 'TCC', '900$'],
-    ['February', 'Olympian Gym Center', '500$'],
-    ['February', 'Hedi Jalil', '44$'],
-    ['February', 'Asiacell', '35$']
-]
-
-supplychain_initial_data = [
-    ['SPH91', '5/1/2025', '20/1/2025'],
-    ['SPH77', '8/2/2025', '28/2/2025'],
-    ['SPH66', '4/3/2025', '15/4/2025'],
-    ['SPH17', '30/4/2025', '15/5/2025'],
-    ['SPH11', '27/5/2025', '1/6/2025']
-]
-
-sales_initial_data = [
-    ['s1', 'Seven Net', '100$'],
-    ['s2', 'Azo Fashion', '200$'],
-    ['s3', 'Asia Pay', '900$'],
-    ['s4', 'eklam', '500$'],
-    ['s5', 'FIG', '44$']
-]
-
-# Create files if not exist and insert initial data
-def initialize_file(file_path, columns, data):
+# Create empty files if not exist
+def initialize_file(file_path, columns):
     if not os.path.exists(file_path):
-        df = pd.DataFrame(data, columns=columns)
-        df.to_csv(file_path, index=False)
+        pd.DataFrame(columns=columns).to_csv(file_path, index=False)
 
-# Initialize files
-initialize_file(REVENUE_FILE, REVENUE_COLUMNS, revenue_initial_data)
-initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS, supplychain_initial_data)
-initialize_file(SALES_FILE, SALES_COLUMNS, sales_initial_data)
+initialize_file(REVENUE_FILE, REVENUE_COLUMNS)
+initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS)
+initialize_file(SALES_FILE, SALES_COLUMNS)
 
-# Clean Amount field
 def clean_amount(val):
     try:
         return float(val.replace('$', '').strip())
     except:
         return 0.0
 
-# Load data
 def load_revenue():
     df = pd.read_csv(REVENUE_FILE)
     if not df.empty:
@@ -73,18 +44,14 @@ def load_sales():
         df['Amount'] = df['Amount'].apply(clean_amount)
     return df
 
-# Save data
 def save_data(file, df):
     df.to_csv(file, index=False)
 
-# Streamlit config
 st.set_page_config(page_title="Company Monthly Dashboard", layout="wide")
 
-# Initialize session state for navigation
 if "page" not in st.session_state:
     st.session_state.page = "Finances Revenue"
 
-# Sidebar navigation
 st.sidebar.title("📅 Monthly Dashboard")
 if st.sidebar.button("💰 Finances Revenue"):
     st.session_state.page = "Finances Revenue"
@@ -93,10 +60,8 @@ if st.sidebar.button("🚛 Supply Chain"):
 if st.sidebar.button("🛒 Sales"):
     st.session_state.page = "Sales"
 
-# Main title
 st.title("📊 Company Monthly Dashboard")
 
-# Finances Revenue Section
 if st.session_state.page == "Finances Revenue":
     st.subheader("💰 Finances Revenue Overview")
     revenue_df = load_revenue()
@@ -106,7 +71,6 @@ if st.session_state.page == "Finances Revenue":
         total_revenue = revenue_df['Amount'].sum()
         st.metric("Total Revenue", f"${total_revenue:,.2f}")
 
-        # Customer Rate Analysis
         below_200 = revenue_df[revenue_df['Amount'] <= 200].shape[0]
         above_200 = revenue_df[revenue_df['Amount'] > 200].shape[0]
 
@@ -119,7 +83,6 @@ if st.session_state.page == "Finances Revenue":
         ax1.set_title("Customer Distribution")
         st.pyplot(fig1)
 
-        # Download customer chart
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Customer Chart", data=buf1.getvalue(),
@@ -129,7 +92,6 @@ if st.session_state.page == "Finances Revenue":
         st.write(f"Customers ≤ 200: {below_200}")
         st.write(f"Customers > 200: {above_200}")
 
-        # Revenue Impact Analysis
         min_revenue = revenue_df['Amount'].min()
         impact_value = (min_revenue / total_revenue) * 100
 
@@ -142,7 +104,6 @@ if st.session_state.page == "Finances Revenue":
         ax2.set_title("Revenue Impact")
         st.pyplot(fig2)
 
-        # Download revenue impact chart
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Revenue Impact Chart", data=buf2.getvalue(),
@@ -161,7 +122,6 @@ if st.session_state.page == "Finances Revenue":
             st.success("Revenue entry added!")
             st.rerun()
 
-# Supply Chain Section
 elif st.session_state.page == "Supply Chain":
     st.subheader("🚛 Supply Chain Overview")
     supply_df = load_supplychain()
@@ -183,7 +143,6 @@ elif st.session_state.page == "Supply Chain":
             st.success("Supply chain entry added!")
             st.rerun()
 
-# Sales Section
 elif st.session_state.page == "Sales":
     st.subheader("🛒 Sales Overview")
     sales_df = load_sales()
