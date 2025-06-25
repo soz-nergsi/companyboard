@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
 import io
 
 SUPPLYCHAIN_FILE = 'supply_chain_data.csv'
@@ -25,37 +27,56 @@ def render():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        st.metric("Total Orders", len(df))
-
+        # Convert PR & PO to datetime
         df['PR'] = pd.to_datetime(df['PR'], format='%d/%m/%Y')
         df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y')
-        df['Duration'] = (df['PO'] - df['PR']).dt.days
-        avg_duration = df['Duration'].mean()
 
-        st.markdown("### 📊 Supply Chain Performance")
+        # Calculate Duration
+        df['Duration'] = (df['PO'] - df['PR']).dt.days
+
+        # Extract month name from PR
+        df['Month'] = df['PR'].dt.strftime('%B')
+
+        # Group by Month
+        month_group = df.groupby('Month').agg({
+            'Job Order': 'count',
+            'Duration': 'mean'
+        }).reset_index()
+
+        # Sort months properly
+        month_group['Month_num'] = pd.to_datetime(month_group['Month'], format='%B').dt.month
+        month_group = month_group.sort_values('Month_num')
+
+        st.markdown(f"**Total Job Orders:** {df.shape[0]}")
+        st.markdown(f"**Average Duration (days):** {df['Duration'].mean():.1f}")
+
+        # Plot
         fig, ax1 = plt.subplots(figsize=(6, 4))
-        ax1.bar(df['Job Order'], df['Duration'], color='skyblue')
-        ax1.set_xlabel('Job Orders')
-        ax1.set_ylabel('Duration (days)', color='blue')
+
+        # Column: Job Orders count
+        ax1.bar(month_group['Month'], month_group['Job Order'], color='#90caf9')
+        ax1.set_xlabel('Month')
+        ax1.set_ylabel('Number of Job Orders', color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
 
+        # Secondary axis: Stepped average duration
         ax2 = ax1.twinx()
-        ax2.step(df['Job Order'], [avg_duration]*len(df), where='mid', color='orange', linewidth=2)
-        ax2.fill_between(df['Job Order'], [avg_duration]*len(df), step='mid', color='orange', alpha=0.3)
-        ax2.set_ylabel('Average Duration', color='orange')
-        ax2.tick_params(axis='y', labelcolor='orange')
+        ax2.step(month_group['Month'], month_group['Duration'], where='mid', color='#f48fb1', linewidth=2)
+        ax2.fill_between(month_group['Month'], month_group['Duration'], step='mid', color='#f48fb1', alpha=0.3)
+        ax2.set_ylabel('Average Duration (days)', color='pink')
+        ax2.tick_params(axis='y', labelcolor='pink')
 
-        plt.title("Job Orders vs. Average Duration")
+        plt.title("Monthly Job Orders & Average Duration")
         plt.xticks(rotation=45)
         plt.tight_layout()
         st.pyplot(fig)
 
         buf = io.BytesIO()
         fig.savefig(buf, format="jpeg", dpi=150, bbox_inches='tight')
-        st.download_button("Download Supply Chain Chart", data=buf.getvalue(), file_name="supply_chain_chart.jpeg", mime="image/jpeg")
+        st.download_button("Download Supply Chain Chart", data=buf.getvalue(),
+                           file_name="supply_chain_chart.jpeg", mime="image/jpeg")
 
-        st.write(f"📊 Average Duration: {avg_duration:.1f} days")
-
+    #### Form to add new entry ####
     st.markdown("### ➕ Add New Supply Chain Entry")
     with st.form("add_supply"):
         job_order = st.text_input("Job Order")
