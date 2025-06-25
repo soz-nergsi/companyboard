@@ -49,17 +49,21 @@ def render():
         st.markdown(f"**Total Job Orders:** {df.shape[0]}")
         st.markdown(f"**Overall Average Duration:** {df['Duration'].mean():.1f} days")
 
-        # Plotting
         fig, ax1 = plt.subplots(figsize=(10, 6))
 
         # Bar Chart for Job Orders
         bars = ax1.bar(full_data['Month'], full_data['Job Order'], color='#90caf9')
 
-        # Add count labels on bars
+        # Add count labels inside bars (bottom)
         for bar, count in zip(bars, full_data['Job Order']):
             if count > 0:
-                ax1.text(bar.get_x() + bar.get_width()/2, count + 0.2,
-                         f"{count} Orders", ha='center', va='bottom', fontsize=9)
+                ax1.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    0.2,  # very bottom inside bar
+                    f"{count}",
+                    ha='center', va='bottom',
+                    fontsize=10, fontweight='bold', color='black'
+                )
 
         ax1.set_xlabel('Month')
         ax1.set_ylabel('Job Orders', color='blue')
@@ -74,11 +78,15 @@ def render():
         ax2.set_ylabel('Average Duration (days)', color='pink')
         ax2.tick_params(axis='y', labelcolor='pink')
 
-        # Add duration labels
+        # Add duration labels just above step
         for month, duration in zip(full_data['Month'], full_data['Duration']):
             if duration > 0:
-                ax2.text(month, duration + 0.2, f"{duration:.1f} Days",
-                         ha='center', va='bottom', fontsize=9)
+                ax2.text(
+                    month, duration + 0.3,
+                    f"{duration:.1f} Days",
+                    ha='center', va='bottom',
+                    fontsize=10, fontweight='bold', color='black'
+                )
 
         plt.title("Monthly Job Orders & Average Duration", fontsize=14)
         plt.xticks(rotation=45)
