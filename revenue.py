@@ -37,31 +37,56 @@ def render():
         total = df['Amount'].sum()
         st.metric("Total Revenue", f"${total:,.2f}")
 
+        # Group customers based on amount
         below_200 = df[df['Amount'] <= 200].shape[0]
         above_200 = df[df['Amount'] > 200].shape[0]
 
         st.markdown("### 📊 Customer Rate Analysis")
         fig1, ax1 = plt.subplots(figsize=(3, 3))
-        ax1.pie([below_200, above_200], labels=['≤ 200', '> 200'], autopct='%1.1f%%', startangle=90)
+        ax1.pie(
+            [below_200, above_200],
+            labels=[f"{below_200} Customers", f"{above_200} Customers"],
+            autopct='%1.1f%%',
+            startangle=90
+        )
         ax1.set_title("Customer Distribution")
         st.pyplot(fig1)
 
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
-        st.download_button("Download Customer Chart", data=buf1.getvalue(), file_name="customer_distribution.jpeg", mime="image/jpeg")
+        st.download_button(
+            "Download Customer Chart",
+            data=buf1.getvalue(),
+            file_name="customer_distribution.jpeg",
+            mime="image/jpeg"
+        )
 
+        # Revenue Impact Analysis
         min_rev = df['Amount'].min()
-        impact = (min_rev / total) * 100
+        remaining_rev = total - min_rev
 
         st.markdown("### 📊 Revenue Impact")
         fig2, ax2 = plt.subplots(figsize=(3, 3))
-        ax2.pie([min_rev, total - min_rev], labels=[f'Min Revenue ({impact:.1f}%)', 'Other'], autopct='%1.1f%%', startangle=90)
+        ax2.pie(
+            [min_rev, remaining_rev],
+            labels=[
+                f"Min Revenue (${min_rev:,.0f})",
+                f"Remaining Revenue (${remaining_rev:,.0f})"
+            ],
+            autopct='%1.1f%%',
+            startangle=90
+        )
         ax2.set_title("Revenue Impact")
         st.pyplot(fig2)
 
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="jpeg", dpi=150, bbox_inches='tight')
-        st.download_button("Download Revenue Impact Chart", data=buf2.getvalue(), file_name="revenue_impact.jpeg", mime="image/jpeg")
+        st.download_button(
+            "Download Revenue Impact Chart",
+            data=buf2.getvalue(),
+            file_name="revenue_impact.jpeg",
+            mime="image/jpeg"
+        )
 
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
