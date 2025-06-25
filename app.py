@@ -4,12 +4,13 @@ st.set_page_config(page_title="Company Monthly Dashboard", layout="wide")
 
 st.sidebar.title("📊 Monthly Dashboard Navigation")
 
-# Use radio instead of buttons
+# Use radio button for stable navigation (sections always visible)
 page = st.sidebar.radio(
-    "Go to section:",
-    ["🏦 Finances Revenue", "🚛 Supply Chain", "🛒 Sales"]
+    "Select section:",
+    ("🏦 Finances Revenue", "🚛 Supply Chain", "🛒 Sales")
 )
 
+# Dynamic import based on selection
 if page == "🏦 Finances Revenue":
     import revenue
     revenue.render()
