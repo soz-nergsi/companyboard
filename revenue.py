@@ -38,7 +38,7 @@ def render():
         total = df['Amount'].sum()
         st.metric("Total Revenue", f"${total:,.2f}")
 
-        # Split into groups
+        # Split groups
         below_df = df[df['Amount'] <= 200]
         above_df = df[df['Amount'] > 200]
 
@@ -48,51 +48,53 @@ def render():
         below_revenue = below_df['Amount'].sum()
         above_revenue = above_df['Amount'].sum()
 
-        # Calmer professional colors
-        colors = ['#90caf9', '#f48fb1']  # Light blue and soft pink
+        colors = ['#90caf9', '#f48fb1']  # Soft blue & pink
 
-        #### Customer Rate Analysis Chart ####
+        #### Customer Rate Analysis ####
         st.markdown("### 📊 Customer Rate Analysis")
 
-        fig1, ax1 = plt.subplots(figsize=(4, 4))
-        sizes_count = [below_count, above_count]
+        sizes = [below_count, above_count]
+        labels = ["≤ $200", "> $200"]
 
+        fig1, ax1 = plt.subplots(figsize=(4, 4))
         wedges, texts, autotexts = ax1.pie(
-            sizes_count,
+            sizes,
             colors=colors,
             autopct='%1.1f%%',
             startangle=90,
-            textprops={'fontsize': 10}
+            textprops={'fontsize': 10},
+            pctdistance=0.7
         )
+
+        # External labels for counts
+        for i, wedge in enumerate(wedges):
+            ang = (wedge.theta2 + wedge.theta1) / 2.
+            x = 1.1 * np.cos(np.deg2rad(ang))
+            y = 1.1 * np.sin(np.deg2rad(ang))
+            ax1.text(x, y, f"{sizes[i]} customers", ha='center', va='center', fontsize=9)
 
         ax1.set_title("Customer Rate Analysis")
         plt.tight_layout()
         st.pyplot(fig1)
 
-        # Custom legend BELOW the chart
+        # Legend below
         st.markdown(
             """
             <div style="text-align: center;">
             <span style="color:#90caf9; font-weight:bold;">⬤ ≤ $200</span> &nbsp;&nbsp;
             <span style="color:#f48fb1; font-weight:bold;">⬤ > $200</span>
             </div>
-            """,
-            unsafe_allow_html=True
+            """, unsafe_allow_html=True
         )
-
-        # ✅ Add count labels after chart
-        st.write(f"Total customers ≤ $200: **{below_count}**")
-        st.write(f"Total customers > $200: **{above_count}**")
 
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Customer Rate Chart", data=buf1.getvalue(),
                            file_name="customer_rate.jpeg", mime="image/jpeg")
 
-        #### Revenue Percentage Impact Chart ####
+        #### Revenue Percentage Impact ####
         st.markdown("### 📊 Revenue Percentage Impact")
 
-        # Compute revenue impact using min revenue / total revenue
         min_revenue = df['Amount'].min()
         impact_percentage = (min_revenue / total) * 100
 
@@ -104,22 +106,21 @@ def render():
             colors=colors,
             autopct='%1.1f%%',
             startangle=90,
-            textprops={'fontsize': 10}
+            textprops={'fontsize': 10},
+            pctdistance=0.7
         )
 
         ax2.set_title("Revenue Percentage Impact")
         plt.tight_layout()
         st.pyplot(fig2)
 
-        # Custom legend BELOW the chart
         st.markdown(
             """
             <div style="text-align: center;">
             <span style="color:#90caf9; font-weight:bold;">⬤ ≤ $200</span> &nbsp;&nbsp;
             <span style="color:#f48fb1; font-weight:bold;">⬤ > $200</span>
             </div>
-            """,
-            unsafe_allow_html=True
+            """, unsafe_allow_html=True
         )
 
         st.markdown(f"**Minimum Revenue Impact:** {impact_percentage:.2f}%")
@@ -129,7 +130,7 @@ def render():
         st.download_button("Download Revenue Impact Chart", data=buf2.getvalue(),
                            file_name="revenue_impact.jpeg", mime="image/jpeg")
 
-    #### Form to add new revenue data ####
+    #### Add Revenue Entry Form ####
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
         date = st.text_input("Date (e.g. February)", value="February")
