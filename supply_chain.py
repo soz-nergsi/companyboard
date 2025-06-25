@@ -27,17 +27,21 @@ def render():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        df['PR'] = pd.to_datetime(df['PR'], format='%d/%m/%Y')
-        df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y')
+        # ✅ Robust datetime parsing that auto-detects date formats:
+        df['PR'] = pd.to_datetime(df['PR'], errors='coerce')
+        df['PO'] = pd.to_datetime(df['PO'], errors='coerce')
+
+        # Drop rows with unparseable dates to prevent crash
+        df = df.dropna(subset=['PR', 'PO'])
+
         df['Duration'] = (df['PO'] - df['PR']).dt.days
         df['Month'] = df['PR'].dt.strftime('%B')
 
-        # Full month list
+        # Full month list for consistent display
         months_full = ['January', 'February', 'March', 'April', 'May', 'June',
                        'July', 'August', 'September', 'October', 'November', 'December']
         full_data = pd.DataFrame({'Month': months_full})
 
-        # Group by Month
         month_group = df.groupby('Month').agg({
             'Job Order': 'count',
             'Duration': 'mean'
@@ -51,15 +55,13 @@ def render():
 
         fig, ax1 = plt.subplots(figsize=(10, 6))
 
-        # Bar Chart for Job Orders
         bars = ax1.bar(full_data['Month'], full_data['Job Order'], color='#90caf9')
 
-        # Add count labels inside bars (bottom)
         for bar, count in zip(bars, full_data['Job Order']):
             if count > 0:
                 ax1.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    0.2,  # very bottom inside bar
+                    bar.get_x() + bar.get_width()/2,
+                    0.2,
                     f"{count}",
                     ha='center', va='bottom',
                     fontsize=10, fontweight='bold', color='black'
@@ -69,7 +71,6 @@ def render():
         ax1.set_ylabel('Job Orders', color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
 
-        # Stepped area for average duration
         ax2 = ax1.twinx()
         ax2.step(full_data['Month'], full_data['Duration'], where='mid',
                  color='#f48fb1', linewidth=2)
@@ -78,7 +79,6 @@ def render():
         ax2.set_ylabel('Average Duration (days)', color='pink')
         ax2.tick_params(axis='y', labelcolor='pink')
 
-        # Add duration labels just above step
         for month, duration in zip(full_data['Month'], full_data['Duration']):
             if duration > 0:
                 ax2.text(
@@ -102,8 +102,8 @@ def render():
     st.markdown("### ➕ Add New Supply Chain Entry")
     with st.form("add_supply"):
         job_order = st.text_input("Job Order")
-        pr = st.text_input("PR Date (e.g. 05/02/2025)")
-        po = st.text_input("PO Date (e.g. 20/02/2025)")
+        pr = st.text_input("PR Date (any format like 5/1/2025 or 01/05/2025)")
+        po = st.text_input("PO Date (any format like 20/1/2025 or 01/20/2025)")
         submit = st.form_submit_button("Add Entry")
         if submit:
             new_row = pd.DataFrame([[job_order, pr, po]], columns=SUPPLYCHAIN_COLUMNS)
