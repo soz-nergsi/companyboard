@@ -56,7 +56,7 @@ def render():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        # ✅ Fully parse after complete loading
+        # ✅ Fully parse after full loading
         df['PR'] = pd.to_datetime(df['PR'], errors='coerce')
         df['PO'] = pd.to_datetime(df['PO'], errors='coerce')
         df = df.dropna(subset=['PR', 'PO'])
