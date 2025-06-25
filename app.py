@@ -1,98 +1,7 @@
-import streamlit as st
-import pandas as pd
-import os
+import io
 import matplotlib.pyplot as plt
 
-# File paths
-REVENUE_FILE = 'finances_revenue.csv'
-SUPPLYCHAIN_FILE = 'supplyChain.csv'
-SALES_FILE = 'sales.csv'
-
-# CSV structures
-REVENUE_COLUMNS = ['DATE', 'Customer', 'Amount']
-SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
-SALES_COLUMNS = ['Job Order', 'Customer', 'Amount']
-
-# Initial data
-revenue_initial_data = [
-    ['February', 'Gasin', '200$'],
-    ['February', 'TCC', '900$'],
-    ['February', 'Olympian Gym Center', '500$'],
-    ['February', 'Hedi Jalil', '44$'],
-    ['February', 'Asiacell', '35$']
-]
-
-supplychain_initial_data = [
-    ['SPH91', '5/1/2025', '20/1/2025'],
-    ['SPH77', '8/2/2025', '28/2/2025'],
-    ['SPH66', '4/3/2025', '15/4/2025'],
-    ['SPH17', '30/4/2025', '15/5/2025'],
-    ['SPH11', '27/5/2025', '1/6/2025']
-]
-
-sales_initial_data = [
-    ['s1', 'Seven Net', '100$'],
-    ['s2', 'Azo Fashion', '200$'],
-    ['s3', 'Asia Pay', '900$'],
-    ['s4', 'eklam', '500$'],
-    ['s5', 'FIG', '44$']
-]
-
-# Create files if not exist and insert initial data
-def initialize_file(file_path, columns, data):
-    if not os.path.exists(file_path):
-        df = pd.DataFrame(data, columns=columns)
-        df.to_csv(file_path, index=False)
-
-initialize_file(REVENUE_FILE, REVENUE_COLUMNS, revenue_initial_data)
-initialize_file(SUPPLYCHAIN_FILE, SUPPLYCHAIN_COLUMNS, supplychain_initial_data)
-initialize_file(SALES_FILE, SALES_COLUMNS, sales_initial_data)
-
-# Helper to clean amount fields
-def clean_amount(val):
-    try:
-        return float(val.replace('$', '').strip())
-    except:
-        return 0.0
-
-# Load data (no cache for latest Streamlit)
-def load_revenue():
-    df = pd.read_csv(REVENUE_FILE)
-    if not df.empty:
-        df['Amount'] = df['Amount'].apply(clean_amount)
-    return df
-
-def load_supplychain():
-    return pd.read_csv(SUPPLYCHAIN_FILE)
-
-def load_sales():
-    df = pd.read_csv(SALES_FILE)
-    if not df.empty:
-        df['Amount'] = df['Amount'].apply(clean_amount)
-    return df
-
-# Save data function
-def save_data(file, df):
-    df.to_csv(file, index=False)
-
-# Streamlit page config
-st.set_page_config(page_title="Company Monthly Dashboard", layout="wide")
-
-# Initialize navigation state
-if "page" not in st.session_state:
-    st.session_state.page = "Finances Revenue"
-
-# Sidebar navigation
-st.sidebar.title("📅 Monthly Dashboard")
-if st.sidebar.button("💰 Finances Revenue"):
-    st.session_state.page = "Finances Revenue"
-if st.sidebar.button("🚛 Supply Chain"):
-    st.session_state.page = "Supply Chain"
-if st.sidebar.button("🛒 Sales"):
-    st.session_state.page = "Sales"
-
-# Main title
-st.title("📊 Company Monthly Dashboard")
+# ... (your previous code stays unchanged)
 
 # Finances Revenue Page
 if st.session_state.page == "Finances Revenue":
@@ -109,13 +18,19 @@ if st.session_state.page == "Finances Revenue":
         above_200 = revenue_df[revenue_df['Amount'] > 200].shape[0]
 
         st.markdown("### 📊 Customer Rate Analysis")
-        fig1, ax1 = plt.subplots()
+        fig1, ax1 = plt.subplots(figsize=(3, 3))  # Smaller size
         ax1.pie([below_200, above_200],
                 labels=['≤ 200', '> 200'],
                 autopct='%1.1f%%',
                 startangle=90)
         ax1.set_title("Customer Distribution")
         st.pyplot(fig1)
+
+        # Download customer chart
+        buf1 = io.BytesIO()
+        fig1.savefig(buf1, format="jpeg", dpi=150, bbox_inches='tight')
+        st.download_button("Download Customer Chart", data=buf1.getvalue(),
+                           file_name="customer_distribution.jpeg", mime="image/jpeg")
 
         st.write(f"Total Customers: {below_200 + above_200}")
         st.write(f"Customers ≤ 200: {below_200}")
@@ -126,13 +41,19 @@ if st.session_state.page == "Finances Revenue":
         impact_value = (min_revenue / total_revenue) * 100
 
         st.markdown("### 📊 Revenue Impact")
-        fig2, ax2 = plt.subplots()
+        fig2, ax2 = plt.subplots(figsize=(3, 3))  # Smaller size
         ax2.pie([min_revenue, total_revenue - min_revenue],
                 labels=[f'Minimum Revenue ({impact_value:.1f}%)', 'Other'],
                 autopct='%1.1f%%',
                 startangle=90)
         ax2.set_title("Revenue Impact")
         st.pyplot(fig2)
+
+        # Download revenue impact chart
+        buf2 = io.BytesIO()
+        fig2.savefig(buf2, format="jpeg", dpi=150, bbox_inches='tight')
+        st.download_button("Download Revenue Impact Chart", data=buf2.getvalue(),
+                           file_name="revenue_impact.jpeg", mime="image/jpeg")
 
     st.markdown("### ➕ Add New Revenue Entry")
     with st.form("add_revenue"):
@@ -146,7 +67,3 @@ if st.session_state.page == "Finances Revenue":
             save_data(REVENUE_FILE, updated_df)
             st.success("Revenue entry added!")
             st.rerun()
-
-# (Supply Chain and Sales sections remain unchanged — your previous code stays perfect)
-
-# You can copy and keep your previous Supply Chain and Sales sections as before
