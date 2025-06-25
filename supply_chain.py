@@ -8,65 +8,66 @@ import io
 SUPPLYCHAIN_FILE = 'supply_chain_data.csv'
 SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
 
-# Initialize file if not exists
 def initialize_file():
     if not os.path.exists(SUPPLYCHAIN_FILE):
         pd.DataFrame(columns=SUPPLYCHAIN_COLUMNS).to_csv(SUPPLYCHAIN_FILE, index=False)
 
 initialize_file()
 
-# Load data
 def load_data():
     return pd.read_csv(SUPPLYCHAIN_FILE)
 
-# Save data
 def save_data(df):
     df.to_csv(SUPPLYCHAIN_FILE, index=False)
 
-# Render function
 def render():
     st.subheader("🚛 Supply Chain Overview")
     df = load_data()
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
+        # Convert to datetime
         df['PR'] = pd.to_datetime(df['PR'], format='%d/%m/%Y')
         df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y')
+        # Calculate individual durations
         df['Duration'] = (df['PO'] - df['PR']).dt.days
         df['Month'] = df['PR'].dt.strftime('%B')
-
-        # Group data by month
-        month_group = df.groupby('Month').agg({
-            'Job Order': 'count',
-            'Duration': 'mean'
-        }).reset_index()
 
         # Full months list (Jan-Dec)
         months_full = ['January', 'February', 'March', 'April', 'May', 'June',
                        'July', 'August', 'September', 'October', 'November', 'December']
         full_data = pd.DataFrame({'Month': months_full})
+
+        # Calculate count and average duration for each month
+        month_group = df.groupby('Month').agg({
+            'Job Order': 'count',
+            'Duration': 'mean'
+        }).reset_index()
+
+        # Merge to full months
         full_data = full_data.merge(month_group, on='Month', how='left').fillna(0)
         full_data['Job Order'] = full_data['Job Order'].astype(int)
 
         st.markdown(f"**Total Job Orders:** {df.shape[0]}")
         st.markdown(f"**Average Duration (days):** {df['Duration'].mean():.1f}")
 
+        # Plotting
         fig, ax1 = plt.subplots(figsize=(10, 6))
 
-        # Bar chart for Job Orders
+        # Bar chart for job orders
         bars = ax1.bar(full_data['Month'], full_data['Job Order'], color='#90caf9')
 
-        # Add count labels on top of bars
+        # Add job order labels
         for bar, count in zip(bars, full_data['Job Order']):
             if count > 0:
-                ax1.text(bar.get_x() + bar.get_width() / 2, count + 0.1,
-                         f"{count} Job Orders", ha='center', va='bottom', fontsize=9)
+                ax1.text(bar.get_x() + bar.get_width()/2, count + 0.1, f"{count} Job Orders",
+                         ha='center', va='bottom', fontsize=9)
 
         ax1.set_xlabel('Month')
         ax1.set_ylabel('Number of Job Orders', color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
 
-        # Stepped area for average duration
+        # Secondary stepped area for duration
         ax2 = ax1.twinx()
         ax2.step(full_data['Month'], full_data['Duration'], where='mid',
                  color='#f48fb1', linewidth=2)
@@ -75,7 +76,7 @@ def render():
         ax2.set_ylabel('Average Duration (days)', color='pink')
         ax2.tick_params(axis='y', labelcolor='pink')
 
-        # Add duration labels only for months with data
+        # Add duration labels
         for month, duration in zip(full_data['Month'], full_data['Duration']):
             if duration > 0:
                 ax2.text(month, duration + 0.1, f"{duration:.1f} Days",
@@ -86,7 +87,7 @@ def render():
         plt.tight_layout()
         st.pyplot(fig)
 
-        # Download button
+        # Download
         buf = io.BytesIO()
         fig.savefig(buf, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Supply Chain Chart", data=buf.getvalue(),
