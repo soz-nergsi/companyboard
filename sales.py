@@ -11,38 +11,50 @@ def initialize_file():
 
 initialize_file()
 
-def clean_amount(val):
-    try:
-        return float(val.replace('$', '').strip())
-    except:
-        return 0.0
-
 def load_data():
-    df = pd.read_csv(SALES_FILE)
-    if not df.empty:
-        df['Amount'] = df['Amount'].apply(clean_amount)
-    return df
+    return pd.read_csv(SALES_FILE)
 
 def save_data(df):
     df.to_csv(SALES_FILE, index=False)
 
 def render():
-    st.subheader("🛒 Sales Overview")
+    st.subheader("🛒 Sales Dashboard")
+
     df = load_data()
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        st.metric("Total Sales Amount", f"${df['Amount'].sum():,.2f}")
+        # Ensure Amount column is numeric
+        df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
 
+        total_orders = len(df)
+        unique_customers = df['Customer'].nunique()
+        total_sales = df['Amount'].sum()
+
+        # Create summary table
+        summary = {
+            "Metric": ["Total Orders", "Unique Customers", "Total Sales"],
+            "Value": [total_orders, unique_customers, f"${total_sales:,.2f}"]
+        }
+        summary_df = pd.DataFrame(summary)
+
+        st.markdown("### 📊 Sales Summary")
+        st.table(summary_df)
+
+    #### Add new entry form ####
     st.markdown("### ➕ Add New Sales Entry")
     with st.form("add_sales"):
         job_order = st.text_input("Job Order")
         customer = st.text_input("Customer")
-        amount = st.number_input("Amount ($)", min_value=0.0, step=0.01)
+        amount = st.text_input("Amount (numeric)")
         submit = st.form_submit_button("Add Sales Entry")
         if submit:
-            new_row = pd.DataFrame([[job_order, customer, f"{amount:.2f}$"]], columns=SALES_COLUMNS)
-            updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
-            save_data(updated_df)
-            st.success("Sales entry added!")
-            st.rerun()
+            try:
+                amount_float = float(amount)
+                new_row = pd.DataFrame([[job_order, customer, amount_float]], columns=SALES_COLUMNS)
+                updated_df = pd.concat([pd.read_csv(SALES_FILE), new_row], ignore_index=True)
+                save_data(updated_df)
+                st.success("Sales entry added!")
+                st.rerun()
+            except:
+                st.error("Please enter a valid numeric amount!")
