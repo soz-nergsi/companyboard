@@ -31,52 +31,55 @@ def render():
         df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y')
         df['Duration'] = (df['PO'] - df['PR']).dt.days
 
-        # Filter only February data
-        df_february = df[df['PR'].dt.month == 2]
+        # Filter February data only
+        feb_df = df[df['PR'].dt.month == 2]
 
-        job_order_count = df_february.shape[0]
-        avg_duration = df_february['Duration'].mean() if job_order_count > 0 else 0
+        job_order_count = feb_df.shape[0]
+        avg_duration = feb_df['Duration'].mean() if job_order_count > 0 else 0
 
-        st.markdown(f"**February Job Orders:** {job_order_count}")
-        st.markdown(f"**February Average Duration:** {avg_duration:.1f} days")
+        st.markdown(f"**Total February Job Orders:** {job_order_count}")
+        st.markdown(f"**Average February Duration:** {avg_duration:.1f} days")
 
+        # Plotting
         fig, ax1 = plt.subplots(figsize=(6, 5))
 
-        # Bar for Job Orders
-        bar = ax1.bar(['February'], [job_order_count], color='#90caf9')
+        # Bar
+        bars = ax1.bar(['February'], [job_order_count], color='#FFEB3B', edgecolor='black')
+
+        # Bar label
         if job_order_count > 0:
-            ax1.text(0, job_order_count + 0.2, f"{job_order_count} Job Orders",
-                     ha='center', va='bottom', fontsize=10)
+            ax1.text(0, job_order_count + 1, f"{job_order_count} Job Orders", 
+                     ha='center', va='bottom', fontsize=11, fontweight='bold')
 
-        ax1.set_ylabel('Job Orders', color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.set_ylabel('Total Requests', color='black')
+        ax1.tick_params(axis='y', labelcolor='black')
 
-        # Stepped area for Average Duration
+        # Stepped average duration
         ax2 = ax1.twinx()
-        ax2.step(['February'], [avg_duration], where='mid', color='#f48fb1', linewidth=2)
-        ax2.fill_between(['February'], [0], [avg_duration], step='mid', color='#f48fb1', alpha=0.3)
-        ax2.set_ylabel('Average Duration (days)', color='pink')
-        ax2.tick_params(axis='y', labelcolor='pink')
+        ax2.step(['February'], [avg_duration], where='mid', color='#E91E63', linewidth=3)
+        ax2.fill_between(['February'], [0], [avg_duration], step='mid', color='#E91E63', alpha=0.2)
+        ax2.set_ylabel('Average Cycle Duration (days)', color='black')
+        ax2.tick_params(axis='y', labelcolor='black')
 
         if avg_duration > 0:
-            ax2.text(0, avg_duration + 0.2, f"{avg_duration:.1f} Days",
-                     ha='center', va='bottom', fontsize=10)
+            ax2.text(0, avg_duration + 0.5, f"{avg_duration:.1f} Days",
+                     ha='center', va='bottom', fontsize=11, fontweight='bold')
 
-        plt.title("February Supply Chain Overview")
+        plt.title("PR Rate & AVG Cycle Duration (February)", fontsize=14, fontweight='bold')
         plt.tight_layout()
         st.pyplot(fig)
 
-        # Download chart
+        # Download
         buf = io.BytesIO()
         fig.savefig(buf, format="jpeg", dpi=150, bbox_inches='tight')
         st.download_button("Download Chart", data=buf.getvalue(),
                            file_name="february_supply_chain_chart.jpeg", mime="image/jpeg")
 
-    #### Add Entry Form ####
-    st.markdown("### ➕ Add New Supply Chain Entry")
+    #### Form ####
+    st.markdown("### ➕ Add New February Supply Chain Entry")
     with st.form("add_supply"):
         job_order = st.text_input("Job Order")
-        pr = st.text_input("PR Date (e.g. 5/2/2025)")
+        pr = st.text_input("PR Date (in February, e.g. 5/2/2025)")
         po = st.text_input("PO Date (e.g. 20/2/2025)")
         submit = st.form_submit_button("Add Supply Entry")
         if submit:
