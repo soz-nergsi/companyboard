@@ -1,43 +1,15 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from io import BytesIO
-from datetime import datetime
-from github import Github, GithubException
 import matplotlib.pyplot as plt
+from io import BytesIO
 
-# GitHub secrets
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-GITHUB_USERNAME = st.secrets["GITHUB_USERNAME"]
-GITHUB_REPO = st.secrets["GITHUB_REPO"]
-GITHUB_BRANCH = st.secrets["GITHUB_BRANCH"]
-CSV_PATH = st.secrets["CSV_PATH"]
-
-# Authenticate with GitHub
-g = Github(GITHUB_TOKEN)
-repo = g.get_user().get_repo(GITHUB_REPO)
+CSV_FILE = "supply_chain_data.csv"
 
 def load_data():
-    try:
-        contents = repo.get_contents(CSV_PATH, ref=GITHUB_BRANCH)
-        df = pd.read_csv(BytesIO(contents.decoded_content))
-        return df
-    except GithubException as e:
-        st.error("Failed to load CSV from GitHub.")
-        return pd.DataFrame(columns=["Job Order", "PR", "PO"])
+    return pd.read_csv(CSV_FILE)
 
 def save_data(df):
-    try:
-        contents = repo.get_contents(CSV_PATH, ref=GITHUB_BRANCH)
-        repo.update_file(
-            path=CSV_PATH,
-            message="Update supply chain data",
-            content=df.to_csv(index=False),
-            sha=contents.sha,
-            branch=GITHUB_BRANCH
-        )
-    except GithubException as e:
-        st.error("Failed to update CSV on GitHub.")
+    df.to_csv(CSV_FILE, index=False)
 
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
@@ -45,60 +17,57 @@ def render():
     df = load_data()
     st.dataframe(df, use_container_width=True)
 
-    #### Clean and prepare data ####
     if not df.empty:
-        # Convert PR and PO to datetime
-        df["PR"] = pd.to_datetime(df["PR"], errors="coerce", dayfirst=False)
-        df["PO"] = pd.to_datetime(df["PO"], errors="coerce", dayfirst=False)
+        df['PR'] = pd.to_datetime(df['PR'], dayfirst=True, errors='coerce')
+        df['PO'] = pd.to_datetime(df['PO'], dayfirst=True, errors='coerce')
+        df['Month'] = df['PR'].dt.strftime('%B')
+        df['Duration'] = (df['PO'] - df['PR']).dt.days
 
-        # Drop rows with invalid dates
-        df = df.dropna(subset=["PR", "PO"])
+        month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December']
+        df['Month'] = pd.Categorical(df['Month'], categories=month_order, ordered=True)
 
-        # Calculate Duration and Month
-        df["Duration"] = (df["PO"] - df["PR"]).dt.days
-        df["Month"] = df["PR"].dt.strftime("%B")
+        monthly_stats = df.groupby('Month').agg(
+            Job_Count=('Job Order', 'count'),
+            Avg_Duration=('Duration', 'mean')
+        ).reset_index().dropna()
 
-        # Aggregate
-        summary = df.groupby("Month").agg({
-            "Job Order": "count",
-            "Duration": "mean"
-        }).rename(columns={
-            "Job Order": "Total Job Orders",
-            "Duration": "Average Duration (days)"
-        }).reset_index()
+        fig, ax1 = plt.subplots(figsize=(10, 5))
+        bars = ax1.bar(monthly_stats['Month'], monthly_stats['Job_Count'], label='Job Orders', color='gray')
+        ax1.set_ylabel("Job Orders", color="gray")
+        ax1.tick_params(axis='y', labelcolor="gray")
 
-        #### Plotting ####
-        fig, ax1 = plt.subplots(figsize=(8, 4))
+        # Job Order labels
+        for bar in bars:
+            height = bar.get_height()
+            ax1.annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                         xytext=(0, 3), textcoords="offset points", ha='center', fontsize=9)
 
         ax2 = ax1.twinx()
-        ax1.bar(summary["Month"], summary["Total Job Orders"], color="lightblue", label="Job Orders")
-        ax2.plot(summary["Month"], summary["Average Duration (days)"], color="orange", marker="o", label="Avg Duration")
+        ax2.step(monthly_stats['Month'], monthly_stats['Avg_Duration'], label='Avg Duration', color='green', where='mid')
+        ax2.set_ylabel("Avg Duration (Days)", color="green")
+        ax2.tick_params(axis='y', labelcolor="green")
 
-        ax1.set_ylabel("Job Orders")
-        ax2.set_ylabel("Avg Duration (days)")
-        ax1.set_title("Monthly Job Orders and Average Duration")
+        # Avg Duration labels
+        for i, avg in enumerate(monthly_stats['Avg_Duration']):
+            ax2.annotate(f'{avg:.1f}', xy=(i, avg), xytext=(0, -15),
+                         textcoords="offset points", ha='center', color='green', fontsize=9)
 
-        fig.tight_layout()
         st.pyplot(fig)
 
-    #### Add new data ####
-    st.markdown("### ➕ Add New Job Order")
-    with st.form("add_job_order_form"):
-        job_order = st.text_input("Job Order (e.g., SPH101)")
-        pr = st.date_input("PR Date")
-        po = st.date_input("PO Date")
-        submitted = st.form_submit_button("Add Job Order")
-
-        if submitted:
-            if po < pr:
-                st.error("PO Date must be after PR Date.")
-            else:
-                new_entry = pd.DataFrame([{
-                    "Job Order": job_order,
-                    "PR": pr.strftime("%d/%m/%Y"),
-                    "PO": po.strftime("%d/%m/%Y")
-                }])
-                df = pd.concat([df, new_entry], ignore_index=True)
+    # Add new entry
+    st.markdown("### ➕ Add New Supply Chain Entry")
+    with st.form("add_supply_chain"):
+        job_order = st.text_input("Job Order")
+        pr = st.text_input("PR Date (dd/mm/yyyy)")
+        po = st.text_input("PO Date (dd/mm/yyyy)")
+        submit = st.form_submit_button("Add Entry")
+        if submit:
+            try:
+                new_row = pd.DataFrame([[job_order, pr, po]], columns=["Job Order", "PR", "PO"])
+                df = pd.concat([df, new_row], ignore_index=True)
                 save_data(df)
-                st.success("Job order added successfully!")
+                st.success("New supply chain entry added!")
                 st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
