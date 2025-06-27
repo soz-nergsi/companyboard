@@ -1,69 +1,84 @@
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
-import datetime
-import os
+import streamlit as st
+from github import Github
+from datetime import datetime
 
-CSV_FILE = "supply_chain_data.csv"
+# GitHub config from secrets
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_FILE = st.secrets["GITHUB_FILE"]
+GITHUB_BRANCH = st.secrets["GITHUB_BRANCH"]
 
+# Load CSV from GitHub
 def load_data():
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
-    else:
-        df = pd.DataFrame(columns=["Job Order", "PR", "PO"])
-    return df
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_user().get_repo(GITHUB_REPO)
+    file_content = repo.get_contents(GITHUB_FILE, ref=GITHUB_BRANCH)
+    return pd.read_csv(BytesIO(file_content.decoded_content))
 
+# Save updated CSV back to GitHub
 def save_data(df):
-    df.to_csv(CSV_FILE, index=False)
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_user().get_repo(GITHUB_REPO)
+    file = repo.get_contents(GITHUB_FILE, ref=GITHUB_BRANCH)
+    csv_data = df.to_csv(index=False).encode()
+    repo.update_file(file.path, "Update supply chain data", csv_data, file.sha, branch=GITHUB_BRANCH)
 
+# Main dashboard renderer
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
 
     df = load_data()
-
-    # Parse date and fix duration + month
-    df['PR'] = pd.to_datetime(df['PR'], format='%d/%m/%Y', errors='coerce')
-    df['PO'] = pd.to_datetime(df['PO'], format='%d/%m/%Y', errors='coerce')
+    df['PR'] = pd.to_datetime(df['PR'])
+    df['PO'] = pd.to_datetime(df['PO'])
     df['Duration'] = (df['PO'] - df['PR']).dt.days
     df['Month'] = df['PR'].dt.strftime('%B')
 
-    st.dataframe(df)
+    monthly = df.groupby('Month').agg(
+        JobOrders=('Job Order', 'count'),
+        AvgDuration=('Duration', 'mean')
+    ).reset_index()
+    monthly['MonthNum'] = pd.to_datetime(monthly['Month'], format='%B').dt.month
+    monthly = monthly.sort_values('MonthNum')
 
-    # Add new data
-    with st.form("add_data"):
-        st.markdown("### ➕ Add Supply Chain Entry")
+    # 📊 Plotting
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+    ax1.bar(monthly['Month'], monthly['JobOrders'], label='Job Orders')
+    for idx, row in monthly.iterrows():
+        ax1.text(row['Month'], row['JobOrders'], f"{int(row['JobOrders'])}", ha='center', va='bottom')
+
+    ax2 = ax1.twinx()
+    ax2.step(monthly['Month'], monthly['AvgDuration'], where='mid', color='orange', label='Avg Duration')
+    for idx, row in monthly.iterrows():
+        ax2.text(row['Month'], row['AvgDuration'], f"{int(row['AvgDuration'])}d", ha='center', va='bottom', color='orange')
+
+    ax1.set_ylabel('Job Orders')
+    ax2.set_ylabel('Avg Duration (days)')
+    fig.tight_layout()
+    st.pyplot(fig)
+
+    # 📋 Raw data table
+    st.markdown("### 📋 Supply Chain Table")
+    st.dataframe(df, use_container_width=True)
+
+    # ➕ Add new data
+    st.markdown("### ➕ Add Job Order")
+    with st.form("add_order"):
         job_order = st.text_input("Job Order")
-        pr = st.text_input("PR Date (DD/MM/YYYY)")
-        po = st.text_input("PO Date (DD/MM/YYYY)")
-        submit = st.form_submit_button("Add Entry")
-        if submit:
-            try:
-                new_row = pd.DataFrame([[job_order, pr, po]], columns=["Job Order", "PR", "PO"])
-                df = pd.concat([df, new_row], ignore_index=True)
-                save_data(df)
-                st.success("New supply chain entry added.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-    # Dashboard graph
-    if not df.empty and 'Month' in df.columns:
-        grouped = df.groupby('Month').agg(
-            Job_Orders=('Job Order', 'count'),
-            Avg_Duration=('Duration', 'mean')
-        ).reset_index()
-
-        fig, ax1 = plt.subplots()
-
-        ax2 = ax1.twinx()
-        ax1.bar(grouped['Month'], grouped['Job_Orders'], color='lightblue', label='Job Orders')
-        ax2.plot(grouped['Month'], grouped['Avg_Duration'], color='green', marker='o', label='Avg Duration')
-
-        ax1.set_xlabel("Month")
-        ax1.set_ylabel("Job Orders", color='blue')
-        ax2.set_ylabel("Avg Duration (days)", color='green')
-        ax1.set_title("Monthly Job Orders and Average Duration")
-
-        st.pyplot(fig)
-
+        pr_date = st.date_input("PR Date")
+        po_date = st.date_input("PO Date")
+        submitted = st.form_submit_button("Submit")
+        if submitted:
+            new_row = {
+                "Job Order": job_order,
+                "PR": pd.to_datetime(pr_date),
+                "PO": pd.to_datetime(po_date),
+            }
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            df['Duration'] = (df['PO'] - df['PR']).dt.days
+            df['Month'] = df['PR'].dt.strftime('%B')
+            save_data(df)
+            st.success("✅ Job order added successfully!")
+            st.rerun()
