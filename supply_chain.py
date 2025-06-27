@@ -1,63 +1,115 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from datetime import datetime
-from io import BytesIO
+import os
+import datetime
+import base64
+import requests
 
-SUPPLY_CHAIN_FILE = "supplychain_data.csv"
+CSV_FILE = "supply_chain_data.csv"
+COLUMNS = ["Job Order", "PR", "PO"]
 
+# Load data
 def load_data():
-    df = pd.read_csv(SUPPLY_CHAIN_FILE)
-    df["PR"] = pd.to_datetime(df["PR"], format="%d/%m/%Y")
-    df["PO"] = pd.to_datetime(df["PO"], format="%d/%m/%Y")
-    df["Duration"] = (df["PO"] - df["PR"]).dt.days
-    df["Month"] = df["PR"].dt.strftime("%B")
-    return df
+    if not os.path.exists(CSV_FILE):
+        pd.DataFrame(columns=COLUMNS).to_csv(CSV_FILE, index=False)
+    return pd.read_csv(CSV_FILE)
+
+# Save data locally
+def save_data(df):
+    df.to_csv(CSV_FILE, index=False)
+
+# Upload to GitHub if token and repo info are present
+def upload_to_github():
+    try:
+        token = st.secrets["GITHUB_TOKEN"]
+        username = st.secrets["GITHUB_USERNAME"]
+        repo = st.secrets["GITHUB_REPO"]
+        branch = st.secrets["GITHUB_BRANCH"]
+    except KeyError:
+        return  # GitHub settings not configured
+
+    api_url = f"https://api.github.com/repos/{username}/{repo}/contents/{CSV_FILE}"
+    headers = {"Authorization": f"token {token}"}
+
+    # Read file content and encode
+    with open(CSV_FILE, "rb") as f:
+        content = f.read()
+        encoded = base64.b64encode(content).decode()
+
+    # Get current SHA
+    response = requests.get(api_url, headers=headers)
+    sha = response.json().get("sha")
+
+    commit_message = "Auto update supply chain data"
+    payload = {
+        "message": commit_message,
+        "content": encoded,
+        "branch": branch,
+        "sha": sha,
+    }
+    requests.put(api_url, headers=headers, json=payload)
 
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
+
     df = load_data()
     st.dataframe(df, use_container_width=True)
 
-    monthly = df.groupby("Month").agg(
-        JobOrders=("Job Order", "count"),
-        AvgDuration=("Duration", "mean")
-    ).reindex([
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ]).dropna()
+    # Parse dates
+    df['PR'] = pd.to_datetime(df['PR'], errors='coerce', dayfirst=True)
+    df['PO'] = pd.to_datetime(df['PO'], errors='coerce', dayfirst=True)
+    df['Duration'] = (df['PO'] - df['PR']).dt.days
+    df['Month'] = df['PR'].dt.strftime('%B')
+
+    # Calculate metrics
+    monthly_summary = df.groupby('Month').agg({
+        'Job Order': 'count',
+        'Duration': 'mean'
+    }).rename(columns={'Job Order': 'Job Orders', 'Duration': 'Avg Duration'}).reset_index()
+
+    # Reorder months
+    month_order = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ]
+    monthly_summary['Month'] = pd.Categorical(monthly_summary['Month'], categories=month_order, ordered=True)
+    monthly_summary = monthly_summary.sort_values('Month')
 
     # Plot
-    fig, ax1 = plt.subplots(figsize=(10, 6))
-    months = monthly.index
-    orders = monthly["JobOrders"]
-    durations = monthly["AvgDuration"]
+    import matplotlib.pyplot as plt
 
-    # Bar for job orders
-    bars = ax1.bar(months, orders, color='gold')
-    ax1.set_ylabel("Total Requests", color='black')
-    ax1.tick_params(axis='y', labelcolor='black')
-    ax1.set_ylim(0, max(orders) + 10)
+    fig, ax1 = plt.subplots(figsize=(10, 5))
 
-    for bar in bars:
-        height = bar.get_height()
-        ax1.annotate(f"{int(height)}", xy=(bar.get_x() + bar.get_width() / 2, height),
-                     xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=10)
-
-    # Stepped line for duration
     ax2 = ax1.twinx()
-    ax2.plot(months, durations, color='magenta', linewidth=2, drawstyle='steps-post')
-    ax2.set_ylabel("Avg PR-PO Duration (Days)", color='magenta')
-    ax2.tick_params(axis='y', labelcolor='magenta')
-    ax2.set_ylim(0, max(durations) + 2)
+    ax1.bar(monthly_summary['Month'], monthly_summary['Job Orders'], color='skyblue', label='Job Orders')
+    ax2.plot(monthly_summary['Month'], monthly_summary['Avg Duration'], color='orange', marker='o', label='Avg Duration (days)')
 
-    for i, val in enumerate(durations):
-        ax2.annotate(f"{val:.1f} Days", (i, val), textcoords="offset points",
-                     xytext=(0, 8), ha='center', color='magenta', fontsize=9)
+    ax1.set_ylabel("Job Orders", color='blue')
+    ax2.set_ylabel("Avg Duration (days)", color='orange')
+    ax1.set_xlabel("Month")
+    fig.suptitle("📈 Job Orders and Average Duration")
 
-    plt.title("PR Rate & AVG Cycle Duration")
-    fig.tight_layout()
+    # Add data labels
+    for i, v in enumerate(monthly_summary['Job Orders']):
+        ax1.text(i, v + 0.1, str(v), ha='center', color='blue')
 
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    st.image(buffer)
+    for i, v in enumerate(monthly_summary['Avg Duration']):
+        ax2.text(i, v + 1, f"{v:.1f}", ha='center', color='orange')
+
+    st.pyplot(fig)
+
+    # Add new entry
+    st.markdown("### ➕ Add New Supply Chain Entry")
+    with st.form("add_supply_chain_entry"):
+        job_order = st.text_input("Job Order")
+        pr = st.date_input("PR Date")
+        po = st.date_input("PO Date")
+        submit = st.form_submit_button("Submit")
+
+        if submit:
+            new_row = pd.DataFrame([[job_order, pr.strftime("%d/%m/%Y"), po.strftime("%d/%m/%Y")]], columns=COLUMNS)
+            updated_df = pd.concat([df.dropna(subset=['PR', 'PO']), new_row], ignore_index=True)
+            save_data(updated_df)
+            upload_to_github()
+            st.success("✅ Entry added and CSV updated.")
+            st.rerun()
