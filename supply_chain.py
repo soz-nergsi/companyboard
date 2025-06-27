@@ -1,73 +1,63 @@
 import streamlit as st
 import pandas as pd
-import os
+import matplotlib.pyplot as plt
 from datetime import datetime
+from io import BytesIO
 
-SUPPLYCHAIN_FILE = "supply_chain_data.csv"
-SUPPLYCHAIN_COLUMNS = ["Job Order", "PR", "PO"]
-
-def initialize_file():
-    if not os.path.exists(SUPPLYCHAIN_FILE):
-        pd.DataFrame(columns=SUPPLYCHAIN_COLUMNS).to_csv(SUPPLYCHAIN_FILE, index=False)
-
-initialize_file()
+SUPPLY_CHAIN_FILE = "supplychain_data.csv"
 
 def load_data():
-    return pd.read_csv(SUPPLYCHAIN_FILE)
-
-def save_data(df):
-    df.to_csv(SUPPLYCHAIN_FILE, index=False)
+    df = pd.read_csv(SUPPLY_CHAIN_FILE)
+    df["PR"] = pd.to_datetime(df["PR"], format="%d/%m/%Y")
+    df["PO"] = pd.to_datetime(df["PO"], format="%d/%m/%Y")
+    df["Duration"] = (df["PO"] - df["PR"]).dt.days
+    df["Month"] = df["PR"].dt.strftime("%B")
+    return df
 
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
-
     df = load_data()
     st.dataframe(df, use_container_width=True)
 
-    if not df.empty:
-        df["PR"] = pd.to_datetime(df["PR"], errors='coerce', dayfirst=False)
-        df["PO"] = pd.to_datetime(df["PO"], errors='coerce', dayfirst=False)
-        df = df.dropna(subset=["PR", "PO"])
+    monthly = df.groupby("Month").agg(
+        JobOrders=("Job Order", "count"),
+        AvgDuration=("Duration", "mean")
+    ).reindex([
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]).dropna()
 
-        df["Duration"] = (df["PO"] - df["PR"]).dt.days
-        df["Month"] = df["PR"].dt.strftime('%B')
+    # Plot
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    months = monthly.index
+    orders = monthly["JobOrders"]
+    durations = monthly["AvgDuration"]
 
-        monthly_summary = df.groupby("Month").agg({
-            "Job Order": "count",
-            "Duration": "mean"
-        }).rename(columns={"Job Order": "Job Orders", "Duration": "Average Days"}).reset_index()
+    # Bar for job orders
+    bars = ax1.bar(months, orders, color='gold')
+    ax1.set_ylabel("Total Requests", color='black')
+    ax1.tick_params(axis='y', labelcolor='black')
+    ax1.set_ylim(0, max(orders) + 10)
 
-        # Fix month order
-        month_order = ["January", "February", "March", "April", "May", "June",
-                       "July", "August", "September", "October", "November", "December"]
-        monthly_summary["Month"] = pd.Categorical(monthly_summary["Month"], categories=month_order, ordered=True)
-        monthly_summary = monthly_summary.sort_values("Month")
+    for bar in bars:
+        height = bar.get_height()
+        ax1.annotate(f"{int(height)}", xy=(bar.get_x() + bar.get_width() / 2, height),
+                     xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=10)
 
-        st.markdown("### 📊 Job Orders and Average Duration")
-        import matplotlib.pyplot as plt
+    # Stepped line for duration
+    ax2 = ax1.twinx()
+    ax2.plot(months, durations, color='magenta', linewidth=2, drawstyle='steps-post')
+    ax2.set_ylabel("Avg PR-PO Duration (Days)", color='magenta')
+    ax2.tick_params(axis='y', labelcolor='magenta')
+    ax2.set_ylim(0, max(durations) + 2)
 
-        fig, ax1 = plt.subplots(figsize=(8, 4))
-        ax2 = ax1.twinx()
+    for i, val in enumerate(durations):
+        ax2.annotate(f"{val:.1f} Days", (i, val), textcoords="offset points",
+                     xytext=(0, 8), ha='center', color='magenta', fontsize=9)
 
-        ax1.bar(monthly_summary["Month"], monthly_summary["Job Orders"], label="Job Orders", alpha=0.6)
-        ax2.plot(monthly_summary["Month"], monthly_summary["Average Days"], color="orange", marker="o", label="Avg Duration (days)")
+    plt.title("PR Rate & AVG Cycle Duration")
+    fig.tight_layout()
 
-        ax1.set_ylabel("Job Orders")
-        ax2.set_ylabel("Avg Duration (days)")
-        ax1.set_xlabel("Month")
-        fig.legend(loc="upper left")
-
-        st.pyplot(fig)
-
-    st.markdown("### ➕ Add New Supply Chain Entry")
-    with st.form("add_supplychain"):
-        job_order = st.text_input("Job Order")
-        pr_date = st.date_input("PR Date")
-        po_date = st.date_input("PO Date")
-        submit = st.form_submit_button("Add Entry")
-        if submit:
-            new_entry = pd.DataFrame([[job_order, pr_date.strftime('%d/%m/%Y'), po_date.strftime('%d/%m/%Y')]], columns=SUPPLYCHAIN_COLUMNS)
-            updated_df = pd.concat([df, new_entry], ignore_index=True)
-            save_data(updated_df)
-            st.success("Entry added successfully!")
-            st.rerun()
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    st.image(buffer)
