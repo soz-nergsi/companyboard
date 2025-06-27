@@ -1,53 +1,22 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-import io
-import base64
-import requests
-import json
+import os
+from datetime import datetime
 
-SUPPLYCHAIN_FILE = 'supply_chain_data.csv'
-SUPPLYCHAIN_COLUMNS = ['Job Order', 'PR', 'PO']
+SUPPLYCHAIN_FILE = "supply_chain_data.csv"
+SUPPLYCHAIN_COLUMNS = ["Job Order", "PR", "PO"]
 
-# Load credentials from Streamlit Secrets
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-GITHUB_USERNAME = st.secrets["GITHUB_USERNAME"]
-GITHUB_REPO = st.secrets["GITHUB_REPO"]
-GITHUB_BRANCH = st.secrets["GITHUB_BRANCH"]
+def initialize_file():
+    if not os.path.exists(SUPPLYCHAIN_FILE):
+        pd.DataFrame(columns=SUPPLYCHAIN_COLUMNS).to_csv(SUPPLYCHAIN_FILE, index=False)
+
+initialize_file()
 
 def load_data():
-    try:
-        repo_api_url = f"https://raw.githubusercontent.com/{GITHUB_USERNAME}/{GITHUB_REPO}/{GITHUB_BRANCH}/{SUPPLYCHAIN_FILE}"
-        df = pd.read_csv(repo_api_url)
-    except:
-        df = pd.DataFrame(columns=SUPPLYCHAIN_COLUMNS)
-    return df
+    return pd.read_csv(SUPPLYCHAIN_FILE)
 
-def save_data_to_github(df, filename):
-    repo_api_url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{filename}"
-
-    response = requests.get(repo_api_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-    sha = response.json()['sha'] if response.status_code == 200 else None
-
-    csv_data = df.to_csv(index=False)
-    encoded_data = base64.b64encode(csv_data.encode()).decode()
-
-    payload = {
-        "message": "Update supply_chain_data.csv via Streamlit",
-        "content": encoded_data,
-        "branch": GITHUB_BRANCH
-    }
-    if sha:
-        payload["sha"] = sha
-
-    put_response = requests.put(
-        repo_api_url,
-        headers={"Authorization": f"token {GITHUB_TOKEN}"},
-        data=json.dumps(payload)
-    )
-    if put_response.status_code not in [200, 201]:
-        st.error(f"❌ Failed to save data to GitHub: {put_response.json()}")
+def save_data(df):
+    df.to_csv(SUPPLYCHAIN_FILE, index=False)
 
 def render():
     st.subheader("🚛 Supply Chain Monthly Dashboard")
@@ -56,29 +25,49 @@ def render():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        # ✅ Fully parse after full loading
-        df['PR'] = pd.to_datetime(df['PR'], errors='coerce')
-        df['PO'] = pd.to_datetime(df['PO'], errors='coerce')
-        df = df.dropna(subset=['PR', 'PO'])
-        df['Duration'] = (df['PO'] - df['PR']).dt.days
+        df["PR"] = pd.to_datetime(df["PR"], errors='coerce', dayfirst=False)
+        df["PO"] = pd.to_datetime(df["PO"], errors='coerce', dayfirst=False)
+        df = df.dropna(subset=["PR", "PO"])
 
-        total_job_orders = df['Job Order'].nunique()
-        average_days = df['Duration'].mean()
+        df["Duration"] = (df["PO"] - df["PR"]).dt.days
+        df["Month"] = df["PR"].dt.strftime('%B')
 
-        st.markdown(f"**Total Unique Job Orders:** {total_job_orders}")
-        st.markdown(f"**Overall Average Duration:** {average_days:.1f} days")
+        monthly_summary = df.groupby("Month").agg({
+            "Job Order": "count",
+            "Duration": "mean"
+        }).rename(columns={"Job Order": "Job Orders", "Duration": "Average Days"}).reset_index()
 
-    #### Add new entry form ####
+        # Fix month order
+        month_order = ["January", "February", "March", "April", "May", "June",
+                       "July", "August", "September", "October", "November", "December"]
+        monthly_summary["Month"] = pd.Categorical(monthly_summary["Month"], categories=month_order, ordered=True)
+        monthly_summary = monthly_summary.sort_values("Month")
+
+        st.markdown("### 📊 Job Orders and Average Duration")
+        import matplotlib.pyplot as plt
+
+        fig, ax1 = plt.subplots(figsize=(8, 4))
+        ax2 = ax1.twinx()
+
+        ax1.bar(monthly_summary["Month"], monthly_summary["Job Orders"], label="Job Orders", alpha=0.6)
+        ax2.plot(monthly_summary["Month"], monthly_summary["Average Days"], color="orange", marker="o", label="Avg Duration (days)")
+
+        ax1.set_ylabel("Job Orders")
+        ax2.set_ylabel("Avg Duration (days)")
+        ax1.set_xlabel("Month")
+        fig.legend(loc="upper left")
+
+        st.pyplot(fig)
+
     st.markdown("### ➕ Add New Supply Chain Entry")
-    with st.form("add_supply"):
+    with st.form("add_supplychain"):
         job_order = st.text_input("Job Order")
-        pr = st.text_input("PR Date (any format like 5/1/2025 or 01/05/2025)")
-        po = st.text_input("PO Date (any format like 20/1/2025 or 01/20/2025)")
+        pr_date = st.date_input("PR Date")
+        po_date = st.date_input("PO Date")
         submit = st.form_submit_button("Add Entry")
         if submit:
-            new_row = pd.DataFrame([[job_order, pr, po]], columns=SUPPLYCHAIN_COLUMNS)
-            updated_df = pd.concat([df, new_row], ignore_index=True)
-            updated_df.to_csv(SUPPLYCHAIN_FILE, index=False)
-            save_data_to_github(updated_df, SUPPLYCHAIN_FILE)
-            st.success("✅ Entry added and saved to GitHub!")
+            new_entry = pd.DataFrame([[job_order, pr_date.strftime('%d/%m/%Y'), po_date.strftime('%d/%m/%Y')]], columns=SUPPLYCHAIN_COLUMNS)
+            updated_df = pd.concat([df, new_entry], ignore_index=True)
+            save_data(updated_df)
+            st.success("Entry added successfully!")
             st.rerun()
